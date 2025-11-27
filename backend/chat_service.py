@@ -4,12 +4,14 @@ AutoGen 聊天服务
 """
 import asyncio
 import logging
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, Any, Dict
 
 from autogen_agentchat.agents import AssistantAgent
 from autogen_agentchat.messages import TextMessage
-from autogen_core.models import ModelFamily
 from autogen_ext.models.openai import OpenAIChatCompletionClient
+
+from config import Settings
+from models import ModelInfo
 
 logger = logging.getLogger(__name__)
 
@@ -17,31 +19,27 @@ logger = logging.getLogger(__name__)
 class ChatService:
     """聊天服务类"""
     
-    def __init__(self, settings):
-        self.settings = settings
+    def __init__(self, settings: Settings) -> None:
+        self.settings: Settings = settings
         self.agent: Optional[AssistantAgent] = None
         self.model_client: Optional[OpenAIChatCompletionClient] = None
-        self.initialized = False
+        self.initialized: bool = False
         
-    async def initialize(self):
+    async def initialize(self) -> None:
         """初始化 AutoGen 代理"""
         if self.initialized:
             logger.warning("聊天服务已经初始化")
             return
         
         try:
+            # 创建模型信息
+            model_info = ModelInfo()
+            
             # 创建模型客户端
-            model_kwargs = {
+            model_kwargs: Dict[str, Any] = {
                 "model": self.settings.model_name,
                 "api_key": self.settings.openai_api_key,
-                "model_info":{
-                    "family": ModelFamily.UNKNOWN,
-                    "vision": False,
-                    "function_calling": True,
-                    "json_output": True,
-                    "structured_output": True,
-                    "multiple_system_messages": True,
-                }
+                "model_info": model_info.model_dump(),
             }
             
             if self.settings.openai_api_base:
@@ -86,12 +84,12 @@ class ChatService:
             logger.error(f"聊天错误: {str(e)}", exc_info=True)
             raise
     
-    def _extract_response(self, response) -> str:
+    def _extract_response(self, response: Any) -> str:
         """提取响应内容"""
         if hasattr(response, 'messages') and response.messages:
             last_message = response.messages[-1]
             if hasattr(last_message, 'content'):
-                return last_message.content
+                return str(last_message.content)
             return str(last_message)
         
         return str(response)
@@ -128,7 +126,7 @@ class ChatService:
             logger.error(error_msg, exc_info=True)
             yield f"抱歉，发生了错误: {str(e)}"
     
-    async def cleanup(self):
+    async def cleanup(self) -> None:
         """清理资源"""
         try:
             self.agent = None
@@ -140,12 +138,12 @@ class ChatService:
 
 
 # 用于测试的主函数
-async def main():
+async def main() -> None:
     """测试函数"""
     from config import get_settings
     
-    settings = get_settings()
-    service = ChatService(settings)
+    settings: Settings = get_settings()
+    service: ChatService = ChatService(settings)
     
     try:
         await service.initialize()

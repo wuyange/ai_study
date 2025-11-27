@@ -3,6 +3,7 @@
 """
 from typing import Optional, Literal
 from pydantic import BaseModel, Field
+from autogen_core.models import ModelFamily
 
 
 class ChatRequest(BaseModel):
@@ -58,4 +59,28 @@ class HealthResponse(BaseModel):
     service: str = Field(default="chat-api", description="服务名称")
     autogen_initialized: bool = Field(..., description="AutoGen 是否已初始化")
     version: str = Field(default="1.0.0", description="API 版本")
+
+
+class ModelInfo(BaseModel):
+    """模型信息配置"""
+    family: ModelFamily = Field(default=ModelFamily.UNKNOWN, description="模型家族")
+    vision: bool = Field(default=False, description="是否支持视觉")
+    function_calling: bool = Field(default=True, description="是否支持函数调用")
+    json_output: bool = Field(default=True, description="是否支持 JSON 输出")
+    structured_output: bool = Field(default=True, description="是否支持结构化输出")
+    multiple_system_messages: bool = Field(default=True, description="是否支持多条系统消息")
+    
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "json_schema_extra": {
+            "example": {
+                "family": "UNKNOWN",
+                "vision": False,
+                "function_calling": True,
+                "json_output": True,
+                "structured_output": True,
+                "multiple_system_messages": True
+            }
+        }
+    }
 
