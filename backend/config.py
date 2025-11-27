@@ -13,10 +13,10 @@ class Settings(BaseSettings):
     # OpenAI 配置
     openai_api_key: str = Field(..., env="OPENAI_API_KEY")
     openai_api_base: str = Field(
-        default="https://api.openai.com/v1",
+        default="https://dashscope.aliyuncs.com/compatible-mode/v1",
         env="OPENAI_API_BASE"
     )
-    model_name: str = Field(default="gpt-4o", env="MODEL_NAME")
+    model_name: str = Field(default="qwen3-max", env="MODEL_NAME")
     
     # 服务器配置
     host: str = Field(default="0.0.0.0", env="HOST")

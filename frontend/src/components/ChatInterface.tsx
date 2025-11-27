@@ -62,8 +62,8 @@ const ChatInterface = () => {
     setMessages(prev => [...prev, assistantMessage])
 
     try {
-      // 使用 SSE 连接后端
-      const response = await fetch('http://localhost:8000/api/chat/stream', {
+      // 使用 SSE 连接后端（使用相对路径，利用 Vite 代理配置）
+      const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
