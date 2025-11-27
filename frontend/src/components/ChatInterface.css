@@ -1,0 +1,183 @@
+.chat-container {
+  width: 100%;
+  max-width: 1200px;
+  height: 90vh;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  animation: slideUp 0.5s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.chat-title {
+  display: flex;
+  align-items: center;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.chat-body {
+  flex: 1;
+  overflow: hidden;
+  padding: 20px;
+  background: linear-gradient(to bottom, #f0f2f5 0%, #e3e6ea 100%);
+}
+
+.bubble-list {
+  height: 100%;
+  background: transparent;
+}
+
+.chat-footer {
+  padding: 20px 30px;
+  background: rgba(255, 255, 255, 0.9);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* 自定义 Bubble 样式 */
+:global(.ant-bubble) {
+  animation: bubbleIn 0.3s ease-out;
+}
+
+@keyframes bubbleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* AI 消息气泡 (左侧) - 白色背景黑色文字 */
+:global(.ant-bubble[data-placement="start"]) {
+  background: #ffffff !important;
+}
+
+:global(.ant-bubble[data-placement="start"] .ant-bubble-content) {
+  background: #ffffff !important;
+  color: #1a1a1a !important;
+  font-size: 15px !important;
+  line-height: 1.6 !important;
+  font-weight: 400 !important;
+}
+
+/* 用户消息气泡 (右侧) - 深紫色背景白色文字 */
+:global(.ant-bubble[data-placement="end"]),
+:global(.ant-bubble[data-placement="end"] .ant-bubble-body),
+:global(.ant-bubble[data-placement="end"] > div) {
+  background: linear-gradient(135deg, #5568d3 0%, #6938a6 100%) !important;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4) !important;
+}
+
+:global(.ant-bubble[data-placement="end"] .ant-bubble-content),
+:global(.ant-bubble[data-placement="end"] .ant-bubble-content > *),
+:global(.ant-bubble[data-placement="end"] .ant-bubble-content p),
+:global(.ant-bubble[data-placement="end"] .ant-bubble-content span),
+:global(.ant-bubble[data-placement="end"] .ant-bubble-content div) {
+  background: transparent !important;
+  color: #ffffff !important;
+  font-size: 16px !important;
+  line-height: 1.7 !important;
+  font-weight: 700 !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+  letter-spacing: 0.5px !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+:global(.ant-sender) {
+  border-radius: 16px !important;
+  border: 2px solid #667eea !important;
+  transition: all 0.3s ease;
+}
+
+:global(.ant-sender:focus-within) {
+  border-color: #764ba2 !important;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+}
+
+:global(.ant-sender-input) {
+  font-size: 15px;
+}
+
+/* 修复发送按钮和图标居中 */
+:global(.ant-sender .ant-input-group-addon) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+:global(.ant-sender button) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 100% !important;
+}
+
+:global(.ant-sender .anticon) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+}
+
+:global(.ant-sender .ant-btn) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .chat-container {
+    height: 100vh;
+    max-width: 100%;
+    border-radius: 0;
+  }
+
+  .chat-header {
+    padding: 15px 20px;
+  }
+
+  .chat-title {
+    font-size: 18px;
+  }
+
+  .chat-body {
+    padding: 15px;
+  }
+
+  .chat-footer {
+    padding: 15px 20px;
+  }
+}
+
