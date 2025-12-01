@@ -8,7 +8,7 @@ from typing import AsyncGenerator, Optional, Any, Dict
 
 from autogen_agentchat.agents import AssistantAgent
 from autogen_agentchat.base import TaskResult
-from autogen_agentchat.messages import TextMessage, BaseAgentEvent, BaseChatMessage
+from autogen_agentchat.messages import TextMessage, BaseAgentEvent, BaseChatMessage, ModelClientStreamingChunkEvent
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
 from config import Settings
@@ -54,7 +54,8 @@ class ChatService:
             self.agent = AssistantAgent(
                 name="assistant",
                 model_client=self.model_client,
-                system_message=self.settings.system_message
+                system_message=self.settings.system_message,
+                model_client_stream=True
             )
             
             self.initialized = True
@@ -95,89 +96,26 @@ class ChatService:
         
         return str(response)
 
-    def _is_message_event(self, event: Any) -> bool:
-        """判断事件是否为消息类型
-        
-        Args:
-            event: AutoGen 事件对象
-            
-        Returns:
-            True 如果是消息事件，False 否则
-        """
-        return isinstance(event, (TaskResult, BaseChatMessage))
-    
-    def _extract_content_from_event(self, event: Any) -> Optional[str]:
-        """从事件中提取文本内容
-        
-        Args:
-            event: AutoGen 事件对象
-            
-        Returns:
-            提取的文本内容，如果无法提取则返回 None
-        """
-        if isinstance(event, TaskResult):
-            return self._extract_response(event)
-        elif isinstance(event, BaseChatMessage):
-            # 只处理助手的消息
-            if hasattr(event, 'source') and event.source == "assistant":
-                return str(event.content) if event.content else None
-            # 如果没有 source 属性，也返回内容
-            return str(event.content) if event.content else None
-        return None
     
     async def stream_chat(self, message: str) -> AsyncGenerator[str, None]:
-        """流式聊天
-        
-        使用 AutoGen 的 run_stream API 实现真正的流式输出。
-        逐步返回 AI 的回复内容，适用于实时对话场景。
-        
-        Args:
-            message: 用户输入的消息
-            
-        Yields:
-            str: AI 回复的文本片段
-            
-        Raises:
-            RuntimeError: 当聊天服务未初始化时抛出
-        """
-        # 1. 验证服务状态
+        """流式聊天"""
         if not self.initialized or not self.agent:
-            error_msg = "聊天服务未初始化"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
-        
-        logger.debug(f"开始处理流式聊天请求: {message[:50]}...")
+            raise RuntimeError("聊天服务未初始化")
         
         try:
-            # 2. 调用 AutoGen 流式 API
-            event_stream = self.agent.run_stream(task=message)
+            logger.debug(f"处理流式聊天请求: {message}")
             
-            # 3. 处理事件流
-            chunk_count = 0
-            async for event in event_stream:
-                # 跳过非消息事件
-                if not self._is_message_event(event):
-                    logger.debug(f"跳过非消息事件: {type(event).__name__}")
-                    continue
+            # 使用 AutoGen 的流式 API
+            response = self.agent.run_stream(task=message)
+
+            async for chunk in response:
+                if isinstance(chunk, ModelClientStreamingChunkEvent) and chunk.source == "assistant":
+                    yield chunk.content
                 
-                # 提取内容
-                content = self._extract_content_from_event(event)
-                if content:
-                    chunk_count += 1
-                    logger.debug(f"生成内容块 #{chunk_count}: {content[:30]}...")
-                    yield content
-                    
-                    # 可选：添加延迟以控制输出速度
-                    if self.settings.stream_delay > 0:
-                        await asyncio.sleep(self.settings.stream_delay)
-            
-            logger.info(f"流式聊天完成，共生成 {chunk_count} 个内容块")
-            
         except Exception as e:
-            error_msg = f"流式聊天处理失败: {str(e)}"
+            error_msg = f"流式聊天错误: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            # 返回友好的错误消息
-            yield f"抱歉，处理您的请求时发生了错误。请稍后重试。"
+            yield f"抱歉，发生了错误: {str(e)}"
     
     async def cleanup(self) -> None:
         """清理资源"""
