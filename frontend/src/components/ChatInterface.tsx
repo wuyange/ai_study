@@ -1,147 +1,186 @@
+/**
+ * 聊天界面组件（多会话版本）
+ * 支持会话管理、历史消息、流式输出等
+ */
 import { useState, useRef, useEffect } from 'react'
 import { Bubble, Sender, XProvider } from '@ant-design/x'
-import { UserOutlined, RobotOutlined, SendOutlined, ClearOutlined } from '@ant-design/icons'
-import { Button, Space, Avatar } from 'antd'
+import { UserOutlined, RobotOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
+import { Button, Avatar, Empty, Spin } from 'antd'
+import { SessionSidebar } from './SessionSidebar'
+import { RenameModal, ExportModal, showDeleteConfirm } from './SessionActions'
+import { useSession } from '../hooks/useSession'
+import { useMessages } from '../hooks/useMessages'
+import * as api from '../api/client'
 import './ChatInterface.css'
 
-interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: Date
-  streaming?: boolean
-}
-
 const ChatInterface = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '0',
-      role: 'assistant',
-      content: '你好！我是AI助手，很高兴为您服务。请问有什么可以帮助您的吗？',
-      timestamp: new Date(),
-    }
-  ])
   const [inputValue, setInputValue] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const listRef = useRef<any>(null)
+  
+  // 重命名对话框状态
+  const [renameVisible, setRenameVisible] = useState(false)
+  const [renamingSessionId, setRenamingSessionId] = useState<string>('')
+  const [renamingCurrentTitle, setRenamingCurrentTitle] = useState('')
+  
+  // 导出对话框状态
+  const [exportVisible, setExportVisible] = useState(false)
+  const [exportingSessionId, setExportingSessionId] = useState<string>('')
+
+  // 使用自定义 Hooks
+  const {
+    sessions,
+    currentSessionId,
+    currentSession,
+    loading: sessionLoading,
+    createSession,
+    switchSession,
+    deleteSession,
+    renameSession,
+    exportSession,
+    refreshCurrentSession,
+  } = useSession()
+
+  const {
+    messages,
+    loading: messageLoading,
+    streaming,
+    loadMessages,
+    sendStreamMessage,
+    clearMessages,
+  } = useMessages()
+
+  // 当切换会话时，加载该会话的消息
+  useEffect(() => {
+    if (currentSessionId) {
+      clearMessages()
+      loadMessages(currentSessionId)
+    }
+  }, [currentSessionId, clearMessages, loadMessages])
 
   // 自动滚动到底部
   useEffect(() => {
     if (listRef.current) {
       setTimeout(() => {
-        listRef.current.scrollToBottom()
+        // 使用 scrollTo 方法代替 scrollToBottom
+        if (typeof listRef.current.scrollTo === 'function') {
+          listRef.current.scrollTo({ top: 999999, behavior: 'smooth' })
+        } else if (listRef.current.scrollIntoView) {
+          listRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
+        }
       }, 100)
     }
   }, [messages])
 
-  // 发送消息
-  const handleSend = async (message: string) => {
-    if (!message.trim() || loading) return
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: message.trim(),
-      timestamp: new Date(),
-    }
-
-    setMessages(prev => [...prev, userMessage])
-    setInputValue('')
-    setLoading(true)
-
-    // 创建一个空的助手消息用于流式输出
-    const assistantMessageId = (Date.now() + 1).toString()
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      role: 'assistant',
-      content: '',
-      timestamp: new Date(),
-      streaming: true,
-    }
-    
-    setMessages(prev => [...prev, assistantMessage])
-
+  /**
+   * 创建新会话
+   */
+  const handleCreateSession = async () => {
+    console.log('[ChatInterface] handleCreateSession called')
     try {
-      // 使用 SSE 连接后端（使用相对路径，利用 Vite 代理配置）
-      const response = await fetch('/api/chat/stream', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message: message.trim() }),
-      })
-
-      if (!response.ok) {
-        throw new Error('网络响应失败')
-      }
-
-      const reader = response.body?.getReader()
-      const decoder = new TextDecoder()
-
-      if (reader) {
-        let accumulatedContent = ''
-        
-        while (true) {
-          const { done, value } = await reader.read()
-          
-          if (done) break
-          
-          const chunk = decoder.decode(value, { stream: true })
-          const lines = chunk.split('\n')
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6)
-              if (data === '[DONE]') {
-                break
-              }
-              
-              try {
-                const parsed = JSON.parse(data)
-                if (parsed.content) {
-                  accumulatedContent += parsed.content
-                  
-                  // 更新消息内容
-                  setMessages(prev => prev.map(msg => 
-                    msg.id === assistantMessageId
-                      ? { ...msg, content: accumulatedContent }
-                      : msg
-                  ))
-                }
-              } catch (e) {
-                console.error('解析JSON失败:', e)
-              }
-            }
-          }
-        }
-        
-        // 流式传输完成，标记为非流式
-        setMessages(prev => prev.map(msg => 
-          msg.id === assistantMessageId
-            ? { ...msg, streaming: false }
-            : msg
-        ))
+      const newSession = await createSession('新对话')
+      console.log('[ChatInterface] createSession returned:', newSession)
+      if (newSession) {
+        clearMessages()
       }
     } catch (error) {
-      console.error('发送消息失败:', error)
-      setMessages(prev => prev.map(msg => 
-        msg.id === assistantMessageId
-          ? { ...msg, content: '抱歉，发生了错误。请稍后再试。', streaming: false }
-          : msg
-      ))
-    } finally {
-      setLoading(false)
+      console.error('[ChatInterface] handleCreateSession error:', error)
     }
   }
 
-  // 清空对话
-  const handleClear = () => {
-    setMessages([{
-      id: '0',
-      role: 'assistant',
-      content: '你好！我是AI助手，很高兴为您服务。请问有什么可以帮助您的吗？',
-      timestamp: new Date(),
-    }])
+  /**
+   * 选择会话
+   */
+  const handleSelectSession = (sessionId: string) => {
+    switchSession(sessionId)
+  }
+
+  /**
+   * 显示重命名对话框
+   */
+  const handleShowRename = (sessionId: string, currentTitle: string) => {
+    setRenamingSessionId(sessionId)
+    setRenamingCurrentTitle(currentTitle)
+    setRenameVisible(true)
+  }
+
+  /**
+   * 执行重命名
+   */
+  const handleRename = async (newTitle: string) => {
+    const success = await renameSession(renamingSessionId, newTitle)
+    if (success) {
+      setRenameVisible(false)
+    }
+  }
+
+  /**
+   * 显示删除确认
+   */
+  const handleShowDelete = (sessionId: string) => {
+    const session = sessions.find((s) => s.id === sessionId)
+    if (session) {
+      showDeleteConfirm(session.title, () => handleDelete(sessionId))
+    }
+  }
+
+  /**
+   * 执行删除
+   */
+  const handleDelete = async (sessionId: string) => {
+    await deleteSession(sessionId)
+  }
+
+  /**
+   * 显示导出对话框
+   */
+  const handleShowExport = (sessionId: string) => {
+    setExportingSessionId(sessionId)
+    setExportVisible(true)
+  }
+
+  /**
+   * 执行导出
+   */
+  const handleExport = async (format: api.ExportFormat) => {
+    await exportSession(exportingSessionId, format)
+    setExportVisible(false)
+  }
+
+  /**
+   * 发送消息
+   */
+  const handleSend = async (message: string) => {
+    if (!message.trim() || streaming || messageLoading) return
+    
+    // 如果没有当前会话，先创建一个
+    let sessionId = currentSessionId
+    if (!sessionId) {
+      const newSession = await createSession('新对话')
+      if (!newSession) return
+      sessionId = newSession.id
+    }
+    
+    // 检查是否是第一条消息
+    const isFirstMessage = messages.length === 0
+    
+    // 发送消息
+    await sendStreamMessage(sessionId, message.trim())
+    
+    // 如果是第一条消息，自动生成标题
+    if (isFirstMessage && sessionId) {
+      try {
+        const result = await api.generateSessionTitle(sessionId)
+        if (result.success) {
+          // 刷新当前会话信息以更新标题
+          await refreshCurrentSession()
+        }
+      } catch (error) {
+        console.error('自动生成标题失败:', error)
+      }
+    }
+    
+    setInputValue('')
   }
 
   // 转换消息为 Bubble.List 格式
@@ -161,48 +200,102 @@ const ChatInterface = () => {
 
   return (
     <XProvider>
-      <div className="chat-container">
-        <div className="chat-header">
-          <div className="chat-title">
-            <RobotOutlined style={{ fontSize: 24, marginRight: 12 }} />
-            <span>AI 助手</span>
-          </div>
-          <Button 
-            icon={<ClearOutlined />} 
-            onClick={handleClear}
-            type="text"
-            style={{ color: 'white' }}
-          >
-            清空对话
-          </Button>
-        </div>
-        
-        <div className="chat-body">
-          <Bubble.List
-            ref={listRef}
-            items={bubbleItems as any}
-            className="bubble-list"
+      <div className="multi-session-container">
+        {/* 侧边栏 */}
+        {!sidebarCollapsed && (
+          <SessionSidebar
+            sessions={sessions}
+            currentSessionId={currentSessionId}
+            loading={sessionLoading}
+            onCreateSession={handleCreateSession}
+            onSelectSession={handleSelectSession}
+            onRenameSession={handleShowRename}
+            onDeleteSession={handleShowDelete}
+            onExportSession={handleShowExport}
           />
+        )}
+
+        {/* 主聊天区域 */}
+        <div className="chat-main-area">
+          <div className="chat-container">
+            {/* 顶部标题栏 */}
+            <div className="chat-header">
+              <div className="chat-title">
+                <Button
+                  type="text"
+                  icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  style={{ color: 'white', marginRight: 12 }}
+                />
+                <RobotOutlined style={{ fontSize: 24, marginRight: 12 }} />
+                <span>{currentSession?.title || 'AI 助手'}</span>
+              </div>
+            </div>
+            
+            {/* 消息列表区域 */}
+            <div className="chat-body">
+              {!currentSessionId ? (
+                <Empty
+                  description="请选择或创建一个会话开始对话"
+                  style={{ marginTop: 100 }}
+                />
+              ) : messageLoading && messages.length === 0 ? (
+                <div style={{ textAlign: 'center', marginTop: 100 }}>
+                  <Spin size="large" />
+                  <div style={{ marginTop: 16, color: '#999' }}>加载消息中...</div>
+                </div>
+              ) : messages.length === 0 ? (
+                <Empty
+                  description="暂无消息，开始对话吧"
+                  style={{ marginTop: 100 }}
+                />
+              ) : (
+                <Bubble.List
+                  ref={listRef}
+                  items={bubbleItems as any}
+                  className="bubble-list"
+                />
+              )}
+            </div>
+
+            {/* 输入区域 */}
+            <div className="chat-footer">
+              <Sender
+                value={inputValue}
+                onChange={setInputValue}
+                onSubmit={handleSend}
+                placeholder={currentSessionId ? "输入消息..." : "请先创建或选择会话"}
+                loading={streaming}
+                disabled={!currentSessionId}
+                allowSpeech={false}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  backdropFilter: 'blur(10px)',
+                }}
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="chat-footer">
-          <Sender
-            value={inputValue}
-            onChange={setInputValue}
-            onSubmit={handleSend}
-            placeholder="输入消息..."
-            loading={loading}
-            allowSpeech={false}
-            style={{
-              background: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(10px)',
-            }}
-          />
-        </div>
+        {/* 重命名对话框 */}
+        <RenameModal
+          visible={renameVisible}
+          currentTitle={renamingCurrentTitle}
+          loading={sessionLoading}
+          onOk={handleRename}
+          onCancel={() => setRenameVisible(false)}
+        />
+
+        {/* 导出对话框 */}
+        <ExportModal
+          visible={exportVisible}
+          loading={sessionLoading}
+          onOk={handleExport}
+          onCancel={() => setExportVisible(false)}
+        />
       </div>
     </XProvider>
   )
 }
 
 export default ChatInterface
-
