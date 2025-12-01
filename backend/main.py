@@ -309,6 +309,10 @@ async def delete_session(session_id: str) -> Dict[str, Any]:
                 detail="会话不存在"
             )
         
+        # 同时删除该会话的 agent
+        if chat_service:
+            chat_service.remove_agent(session_id)
+        
         return {"success": True, "message": "会话删除成功"}
 
 
@@ -391,9 +395,9 @@ async def chat_with_session(
         # 3. 保存用户消息
         await db_manager.add_message(session_id, "user", request.message)
         
-        # 4. 调用 AI（带上下文）
+        # 4. 调用 AI（带上下文，使用会话专属 agent）
         try:
-            response_content = await chat_service.chat_with_context(request.message, history)
+            response_content = await chat_service.chat_with_context(session_id, request.message, history)
             
             # 5. 保存 AI 回复
             await db_manager.add_message(session_id, "assistant", response_content)
@@ -436,11 +440,11 @@ async def event_generator_with_session(
             # 3. 保存用户消息
             await db_manager.add_message(session_id, "user", message)
         
-        # 4. 流式调用 AI（带上下文）
+        # 4. 流式调用 AI（带上下文，使用会话专属 agent）
         logger.info(f"开始流式聊天（会话: {session_id}）: {message[:50]}...")
         chunk_count = 0
         
-        async for chunk in chat_service.stream_chat_with_context(message, history):
+        async for chunk in chat_service.stream_chat_with_context(session_id, message, history):
             accumulated_content += chunk
             yield f"data: {json.dumps({'content': chunk, 'role': 'assistant'})}\n\n"
             chunk_count += 1
