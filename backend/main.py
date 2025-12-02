@@ -4,7 +4,6 @@ FastAPI 后端服务器
 """
 import asyncio
 import json
-import logging
 from typing import AsyncGenerator, Optional, Dict, Any, List
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
@@ -23,13 +22,7 @@ from models import (
 )
 from database import get_db, init_db, AsyncSessionLocal, Session as DBSession, Message as DBMessage
 from db_operations import DatabaseManager
-
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from logger import logger, setup_logger
 
 # 加载环境变量
 load_dotenv()
@@ -45,6 +38,14 @@ chat_service: Optional[ChatService] = None
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """应用生命周期管理"""
     global chat_service
+    
+    # 初始化日志系统
+    setup_logger(
+        log_dir=settings.log_dir,
+        log_level=settings.log_level,
+        log_rotation=settings.log_rotation,
+        log_retention=settings.log_retention
+    )
     
     # 启动时初始化数据库
     logger.info("正在初始化数据库...")

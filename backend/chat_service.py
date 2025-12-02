@@ -4,22 +4,24 @@ AutoGen 聊天服务
 支持多会话管理，每个会话使用独立的 agent
 """
 import asyncio
-import logging
 from typing import AsyncGenerator, Optional, Any, Dict, List, TYPE_CHECKING
 from collections import OrderedDict
 
 from autogen_agentchat.agents import AssistantAgent
-from autogen_agentchat.base import TaskResult
+from autogen_agentchat.base import TaskResult, TerminationCondition
+from autogen_agentchat.conditions import TextMentionTermination, MaxMessageTermination, TokenUsageTermination, \
+    SourceMatchTermination
 from autogen_agentchat.messages import TextMessage, BaseAgentEvent, BaseChatMessage, ModelClientStreamingChunkEvent
+from autogen_agentchat.teams import RoundRobinGroupChat
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
+from termination_condition import SourcePrefixTermination
 from config import Settings
 from models import ModelInfo
+from logger import logger
 
 if TYPE_CHECKING:
     from database import Message
-
-logger = logging.getLogger(__name__)
 
 
 class ChatService:
@@ -98,12 +100,23 @@ class ChatService:
         
         # 创建新的 agent
         logger.info(f"为会话创建新 agent (会话: {session_id[:8]}...)")
-        agent = AssistantAgent(
+        assistant_agent = AssistantAgent(
             name=f"assistant_{session_id[:8]}",
             model_client=self.model_client,
             system_message=self.settings.system_message,
             model_client_stream=True
         )
+
+        quality_agent = AssistantAgent(
+            name=f"quality_agent_{session_id[:8]}",
+            model_client=self.model_client,
+            system_message=self.settings.quality_message,
+            model_client_stream=True
+        )
+
+        termination_condition = (SourcePrefixTermination("quality_agent") & TextMentionTermination("pass")) | MaxMessageTermination(20)
+
+        agent = RoundRobinGroupChat(participants=[assistant_agent, quality_agent], termination_condition=termination_condition)
         
         self.agents[session_id] = agent
         
@@ -190,7 +203,7 @@ class ChatService:
             response = temp_agent.run_stream(task=message)
 
             async for chunk in response:
-                if isinstance(chunk, ModelClientStreamingChunkEvent) and chunk.source == "assistant":
+                if isinstance(chunk, ModelClientStreamingChunkEvent) and (chunk.source.startswith("assistant") or chunk.source.startswith("quality_agent")):
                     yield chunk.content
                 
         except Exception as e:
@@ -295,10 +308,19 @@ class ChatService:
             response = agent.run_stream(task=full_prompt)
             
             chunk_count = 0
+
+            cur_agent = None
+
             async for chunk in response:
-                if isinstance(chunk, ModelClientStreamingChunkEvent) and chunk.source.startswith("assistant"):
-                    chunk_count += 1
-                    yield chunk.content
+                pre_agent = cur_agent
+                if isinstance(chunk, ModelClientStreamingChunkEvent) and chunk.source.startswith("quality_agent"):
+                    yield chunk.content if pre_agent == chunk.source else f"\n---------------------{chunk.source}--------------------------\n" + chunk.content
+                elif isinstance(chunk, ModelClientStreamingChunkEvent) and chunk.source.startswith("assistant"):
+                    yield chunk.content if pre_agent == chunk.source else f"\n---------------------{chunk.source}--------------------------\n" + chunk.content
+                elif isinstance(chunk, TaskResult):
+                    logger.info(f"终止原因为 {chunk.stop_reason}")
+                    break
+                cur_agent = chunk.source
             
             logger.info(f"流式聊天完成 (会话: {session_id[:8]}...)，共生成 {chunk_count} 个内容块")
             
@@ -406,5 +428,6 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    from logger import setup_logger
+    setup_logger()
     asyncio.run(main())
