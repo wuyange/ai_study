@@ -3,32 +3,38 @@
 /* Multi-session Container */
 .multi-session-container {
   display: flex;
-  height: 100vh;
   width: 100%;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  min-height: 0;
+  position: relative;
+  z-index: 1;
 }
 
+/* 右侧主聊天区域 */
 .chat-main-area {
   flex: 1;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: visible;
-  min-height: 0;
+  overflow: hidden;
+  min-width: 0; /* 防止 flex 子元素溢出 */
 }
 
 /* Chat Container */
 .chat-container {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
   min-height: 0;
   background: transparent;
-  position: relative;
+  overflow: hidden;
 }
 
 .chat-header {
+  flex-shrink: 0;
   background: rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(10px);
   color: white;
@@ -37,8 +43,6 @@
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  z-index: 5;
-  position: relative;
 }
 
 .chat-title {
@@ -49,96 +53,46 @@
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-/* Chat Body (Messages Area) */
+/* Chat Body (Messages Area) - 关键滚动区域 */
 .chat-body {
   flex: 1;
-  overflow-y: scroll !important;
-  overflow-x: hidden !important;
+  min-height: 0; /* 关键：让 flex 子元素可以正确滚动 */
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 20px;
-  background: #f0f2f5; /* Lighter grey background */
-  min-height: 0;
-  pointer-events: auto !important;
-  -webkit-overflow-scrolling: touch;
+  background: #f0f2f5;
 }
 
 .bubble-list {
-  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-/* Custom scrollbar for message area - temporarily use native scrollbar */
-
-/* AI Message Bubble (Left) */
-:global(.ant-bubble[data-placement="start"]) {
-  background: #ffffff !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
-  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+/* 自定义滚动条 */
+.chat-body::-webkit-scrollbar {
+  width: 8px;
 }
 
-:global(.ant-bubble[data-placement="start"] .ant-bubble-content) {
-  color: #1a1a1a !important;
-  font-weight: 500 !important;
-  font-size: 15px !important;
-  line-height: 1.6 !important;
-  letter-spacing: 0.2px !important;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+.chat-body::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
 }
 
-/* User Message Bubble (Right) */
-:global(.ant-bubble[data-placement="end"]) {
-  background: linear-gradient(135deg, #5568d3 0%, #6938a6 100%) !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+.chat-body::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.4);
+  border-radius: 4px;
 }
 
-:global(.ant-bubble[data-placement="end"] .ant-bubble-content) {
-  color: #ffffff !important;
-  font-weight: 700 !important; /* Increased boldness */
-  font-size: 16px !important; /* Slightly larger */
-  line-height: 1.7 !important; /* Increased line height */
-  letter-spacing: 0.5px !important; /* Increased letter spacing */
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important; /* More prominent shadow */
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+.chat-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.6);
 }
 
 /* Chat Footer (Input Area) */
 .chat-footer {
+  flex-shrink: 0;
   padding: 16px 24px 24px;
   background: transparent;
-  position: relative;
-  z-index: 10;
-}
-
-/* Sender button alignment */
-:global(.ant-input-group-addon),
-:global(.ant-sender-button),
-:global(.ant-btn),
-:global(.anticon) {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  line-height: 1 !important; /* Ensure vertical alignment */
-}
-
-/* Fix input and button interaction */
-:global(.ant-sender),
-:global(.ant-sender-input),
-:global(.ant-sender .ant-input),
-:global(.ant-sender button) {
-  pointer-events: auto !important;
-  cursor: text !important;
-}
-
-:global(.ant-sender button) {
-  cursor: pointer !important;
-}
-
-/* Loading state */
-:global(.ant-bubble .ant-bubble-loading) {
-  opacity: 0.7;
 }
 
 /* Responsive Design */
@@ -158,31 +112,4 @@
   .chat-footer {
     padding: 12px 16px 16px;
   }
-}
-
-/* Animations */
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* Ensure chat-body scrolling works */
-.chat-body,
-.chat-body * {
-  pointer-events: auto;
 }

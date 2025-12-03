@@ -17,6 +17,7 @@ const ChatInterface = () => {
   const [inputValue, setInputValue] = useState('')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const chatBodyRef = useRef<HTMLDivElement>(null)
+  const shouldAutoScrollRef = useRef(true)
   
   // 重命名对话框状态
   const [renameVisible, setRenameVisible] = useState(false)
@@ -60,15 +61,23 @@ const ChatInterface = () => {
 
   // 自动滚动到底部
   useEffect(() => {
-    if (chatBodyRef.current) {
-      setTimeout(() => {
-        chatBodyRef.current?.scrollTo({
-          top: chatBodyRef.current.scrollHeight,
-          behavior: 'smooth'
-        })
-      }, 100)
-    }
+    if (!chatBodyRef.current || !shouldAutoScrollRef.current) return
+
+    const body = chatBodyRef.current
+    setTimeout(() => {
+      body.scrollTo({
+        top: body.scrollHeight,
+        behavior: 'smooth',
+      })
+    }, 100)
   }, [messages])
+
+  const handleChatScroll = () => {
+    if (!chatBodyRef.current) return
+    const { scrollTop, scrollHeight, clientHeight } = chatBodyRef.current
+    const distanceToBottom = scrollHeight - (scrollTop + clientHeight)
+    shouldAutoScrollRef.current = distanceToBottom < 40
+  }
 
   /**
    * 创建新会话
@@ -231,7 +240,7 @@ const ChatInterface = () => {
             </div>
             
             {/* 消息列表区域 */}
-            <div className="chat-body" ref={chatBodyRef}>
+            <div className="chat-body" ref={chatBodyRef} onScroll={handleChatScroll}>
               {!currentSessionId ? (
                 <Empty
                   description="请选择或创建一个会话开始对话"
