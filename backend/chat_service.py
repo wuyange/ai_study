@@ -314,13 +314,15 @@ class ChatService:
             async for chunk in response:
                 pre_agent = cur_agent
                 if isinstance(chunk, ModelClientStreamingChunkEvent) and chunk.source.startswith("quality_agent"):
+                    logger.debug(f"处理流式聊天内容块: {chunk.source} -> {str(chunk)}")
                     yield chunk.content if pre_agent == chunk.source else f"\n---------------------{chunk.source}--------------------------\n" + chunk.content
+                    cur_agent = chunk.source
                 elif isinstance(chunk, ModelClientStreamingChunkEvent) and chunk.source.startswith("assistant"):
+                    logger.debug(f"处理流式聊天内容块: {chunk.source} -> {str(chunk)}")
                     yield chunk.content if pre_agent == chunk.source else f"\n---------------------{chunk.source}--------------------------\n" + chunk.content
+                    cur_agent = chunk.source
                 elif isinstance(chunk, TaskResult):
                     logger.info(f"终止原因为 {chunk.stop_reason}")
-                    break
-                cur_agent = chunk.source
             
             logger.info(f"流式聊天完成 (会话: {session_id[:8]}...)，共生成 {chunk_count} 个内容块")
             

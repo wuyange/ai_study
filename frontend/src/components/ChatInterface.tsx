@@ -16,7 +16,7 @@ import './ChatInterface.css'
 const ChatInterface = () => {
   const [inputValue, setInputValue] = useState('')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const listRef = useRef<any>(null)
+  const chatBodyRef = useRef<HTMLDivElement>(null)
   
   // 重命名对话框状态
   const [renameVisible, setRenameVisible] = useState(false)
@@ -60,14 +60,12 @@ const ChatInterface = () => {
 
   // 自动滚动到底部
   useEffect(() => {
-    if (listRef.current) {
+    if (chatBodyRef.current) {
       setTimeout(() => {
-        // 使用 scrollTo 方法代替 scrollToBottom
-        if (typeof listRef.current.scrollTo === 'function') {
-          listRef.current.scrollTo({ top: 999999, behavior: 'smooth' })
-        } else if (listRef.current.scrollIntoView) {
-          listRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
-        }
+        chatBodyRef.current?.scrollTo({
+          top: chatBodyRef.current.scrollHeight,
+          behavior: 'smooth'
+        })
       }, 100)
     }
   }, [messages])
@@ -233,7 +231,7 @@ const ChatInterface = () => {
             </div>
             
             {/* 消息列表区域 */}
-            <div className="chat-body">
+            <div className="chat-body" ref={chatBodyRef}>
               {!currentSessionId ? (
                 <Empty
                   description="请选择或创建一个会话开始对话"
@@ -250,11 +248,23 @@ const ChatInterface = () => {
                   style={{ marginTop: 100 }}
                 />
               ) : (
-                <Bubble.List
-                  ref={listRef}
-                  items={bubbleItems as any}
-                  className="bubble-list"
-                />
+                <div className="bubble-list">
+                  {messages.map(msg => (
+                    <Bubble
+                      key={msg.id}
+                      content={msg.content}
+                      avatar={
+                        msg.role === 'user' ? (
+                          <Avatar icon={<UserOutlined />} style={{ background: '#667eea' }} />
+                        ) : (
+                          <Avatar icon={<RobotOutlined />} style={{ background: '#764ba2' }} />
+                        )
+                      }
+                      placement={msg.role === 'user' ? 'end' : 'start'}
+                      typing={msg.streaming ? { step: 3, interval: 30 } : undefined}
+                    />
+                  ))}
+                </div>
               )}
             </div>
 
